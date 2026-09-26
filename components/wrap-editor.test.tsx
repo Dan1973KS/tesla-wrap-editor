@@ -57,6 +57,7 @@ describe("WrapEditor export flow", () => {
   const clickSpy = vi.fn();
   const createObjectURLSpy = vi.fn(() => "blob:mock-url");
   const revokeObjectURLSpy = vi.fn();
+  let lastDownloadName = "";
 
   beforeEach(() => {
     vi.stubGlobal("Image", MockImage);
@@ -72,7 +73,10 @@ describe("WrapEditor export flow", () => {
     vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((callback) => {
       callback(new Blob([new Uint8Array(32)], { type: "image/png" }));
     });
-    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(clickSpy);
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+      lastDownloadName = this.download;
+      clickSpy();
+    });
     vi.stubGlobal("URL", {
       createObjectURL: createObjectURLSpy,
       revokeObjectURL: revokeObjectURLSpy,
@@ -84,6 +88,7 @@ describe("WrapEditor export flow", () => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
     clickSpy.mockReset();
+    lastDownloadName = "";
     createObjectURLSpy.mockClear();
     revokeObjectURLSpy.mockClear();
   });
@@ -111,5 +116,6 @@ describe("WrapEditor export flow", () => {
     await waitFor(() => expect(screen.getByText(/Exported cybertruck\.png/i)).toBeTruthy());
     expect(createObjectURLSpy).toHaveBeenCalled();
     expect(revokeObjectURLSpy).toHaveBeenCalled();
+    expect(lastDownloadName).toBe("cybertruck.png");
   });
 });

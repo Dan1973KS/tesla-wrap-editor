@@ -284,6 +284,7 @@ export function WrapEditor() {
 
         setTemplateImage(image);
         setMaskCanvas(createMaskCanvas(image));
+        setErrorMessage(null);
         setStatusMessage(`Loaded ${selectedTemplate.label} — ${selectedTemplate.trim}.`);
       })
       .catch((error: unknown) => {
@@ -519,10 +520,11 @@ export function WrapEditor() {
 
           <div className="stack-gap-sm">
             <h2>2. Choose wrap artwork</h2>
-            <div className="tab-row" role="tablist" aria-label="Artwork source">
+            <div className="tab-row" aria-label="Artwork source">
               <button
                 type="button"
                 className={artworkSource === "preset" ? "tab-button active" : "tab-button"}
+                aria-pressed={artworkSource === "preset"}
                 onClick={() => setArtworkSource("preset")}
               >
                 Generated presets
@@ -530,6 +532,7 @@ export function WrapEditor() {
               <button
                 type="button"
                 className={artworkSource === "upload" ? "tab-button active" : "tab-button"}
+                aria-pressed={artworkSource === "upload"}
                 onClick={() => setArtworkSource("upload")}
               >
                 Upload image
@@ -552,6 +555,7 @@ export function WrapEditor() {
                     key={preset.id}
                     type="button"
                     className={selectedPresetId === preset.id ? "preset-button active" : "preset-button"}
+                    aria-pressed={selectedPresetId === preset.id}
                     onClick={() => {
                       setSelectedPresetId(preset.id);
                       setArtworkSource("preset");
