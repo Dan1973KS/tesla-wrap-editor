@@ -1,5 +1,6 @@
 "use client";
 
+import NextImage from "next/image";
 import { type ChangeEvent, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { artworkPresets, paintPreset } from "@/lib/pattern-presets";
 import {
@@ -647,10 +648,13 @@ export function WrapEditor() {
                           {isBroken ? (
                             <div className="example-image-fallback">Preview unavailable</div>
                           ) : (
-                            <img
+                            <NextImage
                               src={example.imageUrl}
                               alt={`${selectedTemplate?.label} example wrap ${example.label}`}
+                              width={512}
+                              height={512}
                               loading="lazy"
+                              unoptimized
                               onError={() =>
                                 setBrokenExampleIds((current) =>
                                   current[example.id] ? current : { ...current, [example.id]: true },

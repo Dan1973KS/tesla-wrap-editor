@@ -69,6 +69,7 @@ describe("WrapEditor export flow", () => {
   const createObjectURLSpy = vi.fn(() => "blob:mock-url");
   const revokeObjectURLSpy = vi.fn();
   let lastDownloadName = "";
+  const NativeURL = URL;
 
   beforeEach(() => {
     vi.stubGlobal("FileReader", MockFileReader);
@@ -89,10 +90,13 @@ describe("WrapEditor export flow", () => {
       lastDownloadName = this.download;
       clickSpy();
     });
-    vi.stubGlobal("URL", {
-      createObjectURL: createObjectURLSpy,
-      revokeObjectURL: revokeObjectURLSpy,
-    });
+    vi.stubGlobal(
+      "URL",
+      class extends NativeURL {
+        static createObjectURL = createObjectURLSpy;
+        static revokeObjectURL = revokeObjectURLSpy;
+      } as typeof URL,
+    );
   });
 
   afterEach(() => {
