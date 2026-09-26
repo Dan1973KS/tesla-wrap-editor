@@ -650,7 +650,18 @@ export function WrapEditor() {
                             className={isSelected ? "example-button active" : "example-button"}
                             aria-pressed={isSelected}
                             aria-label={`Load ${example.label} example wrap`}
-                            onClick={() => handleExampleSelect(example)}
+                            onClick={() => {
+                              setBrokenExampleIds((current) => {
+                                if (!current[example.id]) {
+                                  return current;
+                                }
+
+                                const next = { ...current };
+                                delete next[example.id];
+                                return next;
+                              });
+                              handleExampleSelect(example);
+                            }}
                           >
                             {isBroken ? (
                               <div className="example-image-fallback">Preview unavailable</div>
@@ -671,7 +682,7 @@ export function WrapEditor() {
                             )}
                             <span>{example.label}</span>
                             {isSelected && exampleLoadState === "loading" ? <small>Loading…</small> : null}
-                            {isBroken ? <small>Try loading or upload your own image.</small> : null}
+                            {isBroken ? <small>Select to retry, or upload your own image.</small> : null}
                           </button>
                         </div>
                       );
