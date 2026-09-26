@@ -604,10 +604,7 @@ export function WrapEditor() {
                 aria-selected={artworkPanel === "preset"}
                 aria-controls="artwork-panel-preset"
                 tabIndex={artworkPanel === "preset" ? 0 : -1}
-                onClick={() => {
-                  setArtworkPanel("preset");
-                  setArtworkSource("preset");
-                }}
+                onClick={() => setArtworkPanel("preset")}
               >
                 Generated presets
               </button>
@@ -619,10 +616,7 @@ export function WrapEditor() {
                 aria-selected={artworkPanel === "upload"}
                 aria-controls="artwork-panel-upload"
                 tabIndex={artworkPanel === "upload" ? 0 : -1}
-                onClick={() => {
-                  setArtworkPanel("upload");
-                  setArtworkSource("upload");
-                }}
+                onClick={() => setArtworkPanel("upload")}
               >
                 Upload image
               </button>
