@@ -423,6 +423,7 @@ export function WrapEditor() {
         setExampleLoadState("error");
         setExampleFeedback(`${message} Try another example or upload your own artwork.`);
         setStatusMessage(`Example load failed: ${example.label}.`);
+        setTransform(DEFAULT_TRANSFORM);
         setArtworkSource((current) => (current === "example" ? "none" : current));
       });
   }, []);
