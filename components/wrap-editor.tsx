@@ -196,6 +196,7 @@ function drawComposition(options: {
 }
 
 function renderExportBlob(options: {
+  templateImage: HTMLImageElement | null;
   maskCanvas: HTMLCanvasElement;
   uploadImage: HTMLImageElement | null;
   source: ArtworkSource;
@@ -203,7 +204,7 @@ function renderExportBlob(options: {
   transform: TransformState;
   outputSize: number;
 }) {
-  const { maskCanvas, outputSize, presetId, source, transform, uploadImage } = options;
+  const { maskCanvas, outputSize, presetId, source, templateImage, transform, uploadImage } = options;
   const exportCanvas = document.createElement("canvas");
   exportCanvas.width = outputSize;
   exportCanvas.height = outputSize;
@@ -234,6 +235,13 @@ function renderExportBlob(options: {
       artworkCtx.drawImage(maskCanvas, 0, 0);
       previewCtx.drawImage(artworkCanvas, 0, 0);
     }
+  }
+
+  if (templateImage) {
+    const placement = fitWithinSquare(templateImage.naturalWidth, templateImage.naturalHeight, PREVIEW_SIZE);
+    previewCtx.globalAlpha = 0.92;
+    previewCtx.drawImage(templateImage, placement.x, placement.y, placement.width, placement.height);
+    previewCtx.globalAlpha = 1;
   }
 
   ctx.drawImage(scaledTemplate, 0, 0, outputSize, outputSize);
@@ -425,6 +433,7 @@ export function WrapEditor() {
       setIsExporting(true);
       setErrorMessage(null);
       const blob = await renderExportBlob({
+        templateImage,
         maskCanvas,
         uploadImage,
         source: artworkSource,
@@ -637,9 +646,11 @@ export function WrapEditor() {
                 {selectedTemplate?.label} — {selectedTemplate?.trim}
               </p>
             </div>
+{selectedTemplate ? (
             <a href={selectedTemplate.previewUrl} target="_blank" rel="noreferrer" className="inline-link">
               Open upstream vehicle reference
             </a>
+          ) : null}
           </div>
 
           <p id="preview-instructions" className="sr-only">

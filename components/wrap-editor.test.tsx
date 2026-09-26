@@ -135,6 +135,23 @@ describe("WrapEditor export flow", () => {
     expect(screen.getByText(/Loaded upload: photo\.png/i)).toBeTruthy();
   });
 
+
+
+  it("shows an error when the export blob fails Tesla validation", async () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementationOnce((callback) => {
+      callback(new Blob([new Uint8Array(32)], { type: "image/jpeg" }));
+    });
+
+    render(<WrapEditor />);
+
+    await waitFor(() => expect(screen.getByText(/Loaded Cybertruck/i)).toBeTruthy());
+
+    fireEvent.click(screen.getAllByRole("button", { name: /Download PNG/i })[0]);
+
+    await waitFor(() => expect(screen.getByText(/Exported file must be a PNG/i)).toBeTruthy());
+    expect(clickSpy).not.toHaveBeenCalled();
+  });
+
   it("downloads a png when export succeeds", async () => {
     render(<WrapEditor />);
 
