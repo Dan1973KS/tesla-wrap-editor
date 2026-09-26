@@ -69,6 +69,7 @@ describe("WrapEditor export flow", () => {
   const createObjectURLSpy = vi.fn(() => "blob:mock-url");
   const revokeObjectURLSpy = vi.fn();
   let lastDownloadName = "";
+  const NativeURL = URL;
 
   beforeEach(() => {
     vi.stubGlobal("FileReader", MockFileReader);
@@ -89,10 +90,13 @@ describe("WrapEditor export flow", () => {
       lastDownloadName = this.download;
       clickSpy();
     });
-    vi.stubGlobal("URL", {
-      createObjectURL: createObjectURLSpy,
-      revokeObjectURL: revokeObjectURLSpy,
-    });
+    vi.stubGlobal(
+      "URL",
+      class extends NativeURL {
+        static createObjectURL = createObjectURLSpy;
+        static revokeObjectURL = revokeObjectURLSpy;
+      } as typeof URL,
+    );
   });
 
   afterEach(() => {
@@ -124,7 +128,7 @@ describe("WrapEditor export flow", () => {
 
     await waitFor(() => expect(screen.getByText(/Loaded Cybertruck/i)).toBeTruthy());
 
-    fireEvent.click(screen.getByRole("button", { name: /Upload image/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /Upload image/i }));
     fireEvent.change(screen.getByLabelText(/Upload artwork image/i), {
       target: {
         files: [new File(["fake-image"], "photo.png", { type: "image/png" })],
@@ -133,6 +137,41 @@ describe("WrapEditor export flow", () => {
 
     await waitFor(() => expect(screen.getByText(/Current upload: photo\.png/i)).toBeTruthy());
     expect(screen.getByText(/Loaded upload: photo\.png/i)).toBeTruthy();
+  });
+
+  it("shows only the selected vehicle example gallery", async () => {
+    render(<WrapEditor />);
+
+    await waitFor(() => expect(screen.getByText(/Loaded Cybertruck/i)).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("tab", { name: /Example wraps/i }));
+
+    expect(screen.getByRole("button", { name: /Load Graffiti orange example wrap/i })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Load Vintage Stripes example wrap/i })).toBeNull();
+
+    fireEvent.change(screen.getByLabelText(/Vehicle template/i), { target: { value: "model3" } });
+
+    await waitFor(() => expect(screen.getByText(/Loaded Model 3 — Legacy/i)).toBeTruthy());
+    await waitFor(() => expect(screen.queryByRole("button", { name: /Load Graffiti orange example wrap/i })).toBeNull());
+    expect(screen.getByRole("button", { name: /Load Vintage Stripes example wrap/i })).toBeTruthy();
+  });
+
+  it("clears a selected example when switching vehicles", async () => {
+    render(<WrapEditor />);
+
+    await waitFor(() => expect(screen.getByText(/Loaded Cybertruck/i)).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("tab", { name: /Example wraps/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Load Graffiti orange example wrap/i }));
+
+    await waitFor(() => expect(screen.getByText(/Loaded example: Graffiti orange\./i)).toBeTruthy());
+    await waitFor(() => expect(document.querySelector(".example-button.active")).toBeTruthy());
+
+    fireEvent.change(screen.getByLabelText(/Vehicle template/i), { target: { value: "model3" } });
+
+    await waitFor(() => expect(screen.getByText(/Loaded Model 3 — Legacy/i)).toBeTruthy());
+    expect(document.querySelector(".example-button.active")).toBeNull();
+    expect(screen.getByText(/Select an example, a preset, or upload artwork to fill the masked area\./i)).toBeTruthy();
   });
 
 

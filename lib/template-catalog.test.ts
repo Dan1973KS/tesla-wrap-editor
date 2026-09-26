@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   defaultTemplateId,
   findTemplateById,
+  getExampleWrapsByTemplateId,
   getTemplatesByFamily,
   SOURCE_COMMIT,
   SOURCE_REPO,
@@ -32,5 +33,19 @@ describe("template catalog", () => {
       "modely-2025-performance",
       "modely-l",
     ]);
+  });
+
+  it("keeps example wraps scoped to each template directory", () => {
+    const cybertruckExamples = getExampleWrapsByTemplateId("cybertruck");
+    const model3Examples = getExampleWrapsByTemplateId("model3");
+    const plaidExamples = getExampleWrapsByTemplateId("models-2025-plaid");
+
+    expect(cybertruckExamples).toHaveLength(36);
+    expect(cybertruckExamples.some((example) => example.fileName === "Graffiti_orange.png")).toBe(true);
+    expect(cybertruckExamples.every((example) => example.imageUrl.includes("/cybertruck/example/"))).toBe(true);
+    expect(model3Examples).toHaveLength(20);
+    expect(model3Examples.some((example) => example.fileName === "Graffiti_orange.png")).toBe(false);
+    expect(model3Examples.every((example) => example.imageUrl.includes("/model3/example/"))).toBe(true);
+    expect(plaidExamples.some((example) => example.fileName === "Alpha_Mask.png")).toBe(true);
   });
 });
