@@ -274,19 +274,36 @@ export function WrapEditor() {
   );
 
   useEffect(() => {
+    let cancelled = false;
+
     loadImage(selectedTemplate.templateUrl)
       .then((image) => {
+        if (cancelled) {
+          return;
+        }
+
         setTemplateImage(image);
         setMaskCanvas(createMaskCanvas(image));
         setStatusMessage(`Loaded ${selectedTemplate.label} — ${selectedTemplate.trim}.`);
       })
       .catch((error: unknown) => {
+        if (cancelled) {
+          return;
+        }
+
         const message = error instanceof Error ? error.message : "Unable to load the selected template.";
         setErrorMessage(message);
         setStatusMessage("Template load failed.");
       })
-      .finally(() => setIsTemplateLoading(false));
+      .finally(() => {
+        if (!cancelled) {
+          setIsTemplateLoading(false);
+        }
+      });
 
+    return () => {
+      cancelled = true;
+    };
   }, [selectedTemplate]);
 
   useEffect(() => {
@@ -430,8 +447,10 @@ export function WrapEditor() {
       const anchor = document.createElement("a");
       anchor.href = downloadUrl;
       anchor.download = buildDownloadName(exportName);
+      document.body.append(anchor);
       anchor.click();
-      URL.revokeObjectURL(downloadUrl);
+      anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
       setStatusMessage(`Exported ${buildDownloadName(exportName)} (${Math.round(blob.size / 1024)} KB).`);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Export failed.";

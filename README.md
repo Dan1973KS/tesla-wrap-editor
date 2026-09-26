@@ -90,7 +90,7 @@ Because remote assets can change over time, the source commit is pinned. If you 
 ## Adding another vehicle template
 
 1. Confirm the vehicle directory exists in `teslamotors/custom-wraps`.
-2. Add a new `buildTemplate(...)` entry in `/home/runner/work/tesla-wrap-editor/tesla-wrap-editor/lib/template-catalog.ts`.
+2. Add a new `buildTemplate(...)` entry in `lib/template-catalog.ts`.
 3. Point it to the directory that contains `template.png` and `vehicle_image.png`.
 4. If the upstream source commit changes, update `SOURCE_COMMIT` after verifying the new asset paths.
 5. Run:
