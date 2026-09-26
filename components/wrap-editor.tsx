@@ -11,6 +11,7 @@ import {
 } from "@/lib/export-validation";
 import {
   defaultTemplateId,
+  type ExampleWrapDefinition,
   findTemplateById,
   getTemplatesByFamily,
   SOURCE_COMMIT,
@@ -19,7 +20,8 @@ import {
   templateFamilies,
 } from "@/lib/template-catalog";
 
-type ArtworkSource = "none" | "upload" | "preset";
+type ArtworkSource = "none" | "upload" | "preset" | "example";
+type ArtworkPanel = Exclude<ArtworkSource, "none">;
 
 type TransformState = {
   x: number;
@@ -107,7 +109,7 @@ function drawArtworkLayer(
   ctx: CanvasRenderingContext2D,
   source: ArtworkSource,
   transform: TransformState,
-  uploadImage: HTMLImageElement | null,
+  artworkImage: HTMLImageElement | null,
   presetId: string,
 ) {
   if (source === "none") {
@@ -121,11 +123,11 @@ function drawArtworkLayer(
 
   const maxBox = PREVIEW_SIZE * 0.72;
 
-  if (source === "upload" && uploadImage) {
-    const ratio = Math.min(maxBox / uploadImage.naturalWidth, maxBox / uploadImage.naturalHeight);
-    const width = uploadImage.naturalWidth * ratio;
-    const height = uploadImage.naturalHeight * ratio;
-    ctx.drawImage(uploadImage, -width / 2, -height / 2, width, height);
+  if ((source === "upload" || source === "example") && artworkImage) {
+    const ratio = Math.min(maxBox / artworkImage.naturalWidth, maxBox / artworkImage.naturalHeight);
+    const width = artworkImage.naturalWidth * ratio;
+    const height = artworkImage.naturalHeight * ratio;
+    ctx.drawImage(artworkImage, -width / 2, -height / 2, width, height);
   }
 
   if (source === "preset") {
@@ -142,12 +144,12 @@ function drawComposition(options: {
   canvas: HTMLCanvasElement;
   templateImage: HTMLImageElement;
   maskCanvas: HTMLCanvasElement;
-  uploadImage: HTMLImageElement | null;
+  artworkImage: HTMLImageElement | null;
   source: ArtworkSource;
   presetId: string;
   transform: TransformState;
 }) {
-  const { canvas, maskCanvas, presetId, source, templateImage, transform, uploadImage } = options;
+  const { artworkImage, canvas, maskCanvas, presetId, source, templateImage, transform } = options;
   const ctx = canvas.getContext("2d");
 
   if (!ctx) {
@@ -180,7 +182,7 @@ function drawComposition(options: {
     const artworkCtx = artworkCanvas.getContext("2d");
 
     if (artworkCtx) {
-      drawArtworkLayer(artworkCtx, source, transform, uploadImage, presetId);
+      drawArtworkLayer(artworkCtx, source, transform, artworkImage, presetId);
       artworkCtx.globalCompositeOperation = "destination-in";
       artworkCtx.drawImage(maskCanvas, 0, 0);
       renderCtx.drawImage(artworkCanvas, 0, 0);
@@ -198,13 +200,13 @@ function drawComposition(options: {
 function renderExportBlob(options: {
   templateImage: HTMLImageElement | null;
   maskCanvas: HTMLCanvasElement;
-  uploadImage: HTMLImageElement | null;
+  artworkImage: HTMLImageElement | null;
   source: ArtworkSource;
   presetId: string;
   transform: TransformState;
   outputSize: number;
 }) {
-  const { maskCanvas, outputSize, presetId, source, templateImage, transform, uploadImage } = options;
+  const { artworkImage, maskCanvas, outputSize, presetId, source, templateImage, transform } = options;
   const exportCanvas = document.createElement("canvas");
   exportCanvas.width = outputSize;
   exportCanvas.height = outputSize;
@@ -230,7 +232,7 @@ function renderExportBlob(options: {
     const artworkCtx = artworkCanvas.getContext("2d");
 
     if (artworkCtx) {
-      drawArtworkLayer(artworkCtx, source, transform, uploadImage, presetId);
+      drawArtworkLayer(artworkCtx, source, transform, artworkImage, presetId);
       artworkCtx.globalCompositeOperation = "destination-in";
       artworkCtx.drawImage(maskCanvas, 0, 0);
       previewCtx.drawImage(artworkCanvas, 0, 0);
@@ -260,9 +262,15 @@ function renderExportBlob(options: {
 export function WrapEditor() {
   const [selectedTemplateId, setSelectedTemplateId] = useState(defaultTemplateId);
   const [artworkSource, setArtworkSource] = useState<ArtworkSource>("preset");
+  const [artworkPanel, setArtworkPanel] = useState<ArtworkPanel>("preset");
   const [selectedPresetId, setSelectedPresetId] = useState(artworkPresets[0]?.id ?? "midnight");
   const [uploadImage, setUploadImage] = useState<HTMLImageElement | null>(null);
   const [uploadName, setUploadName] = useState("");
+  const [selectedExampleId, setSelectedExampleId] = useState<string | null>(null);
+  const [exampleImage, setExampleImage] = useState<HTMLImageElement | null>(null);
+  const [exampleLoadState, setExampleLoadState] = useState<"idle" | "loading" | "error">("idle");
+  const [exampleFeedback, setExampleFeedback] = useState<string | null>(null);
+  const [brokenExampleIds, setBrokenExampleIds] = useState<Record<string, boolean>>({});
   const [transform, setTransform] = useState<TransformState>(DEFAULT_TRANSFORM);
   const [exportName, setExportName] = useState(() => sanitizeFilenameBase(defaultTemplateId) || "tesla-wrap");
   const [outputSize, setOutputSize] = useState<number>(1024);
@@ -277,11 +285,14 @@ export function WrapEditor() {
 
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const previewRegionRef = useRef<HTMLDivElement | null>(null);
+  const exampleRequestIdRef = useRef(0);
 
   const selectedTemplate = useMemo(() => findTemplateById(selectedTemplateId), [selectedTemplateId]);
+  const selectedExamples = selectedTemplate?.examples ?? [];
   const catalogError = "No templates are configured. Add at least one entry to the template catalog.";
   const effectiveStatusMessage = selectedTemplate ? statusMessage : "Template catalog is empty.";
   const activeErrorMessage = selectedTemplate ? errorMessage : catalogError;
+  const activeRasterImage = artworkSource === "example" ? exampleImage : uploadImage;
   const groupedTemplates = useMemo(
     () => templateFamilies.map((family) => ({ family, options: getTemplatesByFamily(family) })),
     [],
@@ -333,15 +344,15 @@ export function WrapEditor() {
     }
 
     drawComposition({
+      artworkImage: activeRasterImage,
       canvas: previewCanvasRef.current,
       templateImage,
       maskCanvas,
-      uploadImage,
       source: artworkSource,
       presetId: selectedPresetId,
       transform,
     });
-  }, [artworkSource, maskCanvas, previewVersion, selectedPresetId, templateImage, transform, uploadImage]);
+  }, [activeRasterImage, artworkSource, maskCanvas, previewVersion, selectedPresetId, templateImage, transform]);
 
   useEffect(() => {
     if (!previewRegionRef.current) {
@@ -365,6 +376,7 @@ export function WrapEditor() {
       const image = await loadImage(dataUrl);
       setUploadImage(image);
       setUploadName(file.name);
+      setArtworkPanel("upload");
       setArtworkSource("upload");
       setStatusMessage(`Loaded upload: ${file.name}`);
       setErrorMessage(null);
@@ -378,12 +390,53 @@ export function WrapEditor() {
     setTransform((current) => ({ ...current, [key]: value }));
   }, []);
 
+  const handleExampleSelect = useCallback((example: ExampleWrapDefinition) => {
+    const requestId = exampleRequestIdRef.current + 1;
+    exampleRequestIdRef.current = requestId;
+    setSelectedExampleId(example.id);
+    setExampleLoadState("loading");
+    setExampleFeedback(`Loading ${example.label}…`);
+    setErrorMessage(null);
+    setStatusMessage(`Loading example: ${example.label}…`);
+
+    loadImage(example.imageUrl)
+      .then((image) => {
+        if (exampleRequestIdRef.current !== requestId) {
+          return;
+        }
+
+        setExampleImage(image);
+        setArtworkPanel("example");
+        setArtworkSource("example");
+        setExampleLoadState("idle");
+        setExampleFeedback(`Loaded ${example.label}.`);
+        setStatusMessage(`Loaded example: ${example.label}.`);
+      })
+      .catch((error: unknown) => {
+        if (exampleRequestIdRef.current !== requestId) {
+          return;
+        }
+
+        const message = error instanceof Error ? error.message : "Unable to load the selected example.";
+        setExampleImage(null);
+        setExampleLoadState("error");
+        setExampleFeedback(`${message} Try another example or upload your own artwork.`);
+        setStatusMessage(`Example load failed: ${example.label}.`);
+        setArtworkSource((current) => (current === "example" ? "none" : current));
+      });
+  }, []);
+
   const resetArtwork = useCallback(() => {
     setUploadImage(null);
     setUploadName("");
+    setExampleImage(null);
+    setSelectedExampleId(null);
+    setExampleLoadState("idle");
+    setExampleFeedback(null);
+    exampleRequestIdRef.current += 1;
     setArtworkSource("none");
     setTransform(DEFAULT_TRANSFORM);
-    setStatusMessage("Artwork reset. Select a preset or upload a new image.");
+    setStatusMessage("Artwork reset. Select an example, a preset, or upload a new image.");
   }, []);
 
   const handlePointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
@@ -433,9 +486,9 @@ export function WrapEditor() {
       setIsExporting(true);
       setErrorMessage(null);
       const blob = await renderExportBlob({
+        artworkImage: activeRasterImage,
         templateImage,
         maskCanvas,
-        uploadImage,
         source: artworkSource,
         presetId: selectedPresetId,
         transform,
@@ -463,7 +516,7 @@ export function WrapEditor() {
     } finally {
       setIsExporting(false);
     }
-  }, [artworkSource, exportName, maskCanvas, outputSize, selectedPresetId, templateImage, transform, uploadImage]);
+  }, [activeRasterImage, artworkSource, exportName, maskCanvas, outputSize, selectedPresetId, templateImage, transform]);
 
   return (
     <main className="page-shell">
@@ -494,10 +547,17 @@ export function WrapEditor() {
               className="field-input"
               value={selectedTemplateId}
               onChange={(event) => {
+                exampleRequestIdRef.current += 1;
                 setIsTemplateLoading(true);
                 setTemplateImage(null);
                 setMaskCanvas(null);
                 setErrorMessage(null);
+                setSelectedExampleId(null);
+                setExampleImage(null);
+                setExampleLoadState("idle");
+                setExampleFeedback(null);
+                setBrokenExampleIds({});
+                setArtworkSource((current) => (current === "example" ? "none" : current));
                 setStatusMessage("Loading template…");
                 setTransform(DEFAULT_TRANSFORM);
                 setExportName(sanitizeFilenameBase(event.target.value) || "tesla-wrap");
@@ -525,23 +585,94 @@ export function WrapEditor() {
             <div className="tab-row" aria-label="Artwork source">
               <button
                 type="button"
-                className={artworkSource === "preset" ? "tab-button active" : "tab-button"}
-                aria-pressed={artworkSource === "preset"}
-                onClick={() => setArtworkSource("preset")}
+                className={artworkPanel === "example" ? "tab-button active" : "tab-button"}
+                aria-pressed={artworkPanel === "example"}
+                onClick={() => setArtworkPanel("example")}
+              >
+                Example wraps
+              </button>
+              <button
+                type="button"
+                className={artworkPanel === "preset" ? "tab-button active" : "tab-button"}
+                aria-pressed={artworkPanel === "preset"}
+                onClick={() => {
+                  setArtworkPanel("preset");
+                  setArtworkSource("preset");
+                }}
               >
                 Generated presets
               </button>
               <button
                 type="button"
-                className={artworkSource === "upload" ? "tab-button active" : "tab-button"}
-                aria-pressed={artworkSource === "upload"}
-                onClick={() => setArtworkSource("upload")}
+                className={artworkPanel === "upload" ? "tab-button active" : "tab-button"}
+                aria-pressed={artworkPanel === "upload"}
+                onClick={() => {
+                  setArtworkPanel("upload");
+                  setArtworkSource("upload");
+                }}
               >
                 Upload image
               </button>
             </div>
 
-            {artworkSource === "upload" ? (
+            {artworkPanel === "example" ? (
+              <div className="stack-gap-xs">
+                <div>
+                  <p id="example-gallery-label" className="field-label">
+                    Example wraps for {selectedTemplate?.label}
+                  </p>
+                  <p className="field-help">
+                    These PNGs come from the upstream <code>example/</code> folder for the currently selected vehicle only.
+                  </p>
+                </div>
+                {selectedExamples.length === 0 ? (
+                  <div className="example-gallery-state" role="status">
+                    No example wraps are listed for this vehicle yet. You can still upload your own artwork.
+                  </div>
+                ) : (
+                  <div className="example-grid" role="list" aria-labelledby="example-gallery-label">
+                    {selectedExamples.map((example) => {
+                      const isSelected = selectedExampleId === example.id && (artworkSource === "example" || exampleLoadState !== "idle");
+                      const isBroken = Boolean(brokenExampleIds[example.id]);
+
+                      return (
+                        <button
+                          key={example.id}
+                          type="button"
+                          className={isSelected ? "example-button active" : "example-button"}
+                          aria-pressed={isSelected}
+                          aria-label={`Load ${example.label} example wrap`}
+                          onClick={() => handleExampleSelect(example)}
+                        >
+                          {isBroken ? (
+                            <div className="example-image-fallback">Preview unavailable</div>
+                          ) : (
+                            <img
+                              src={example.imageUrl}
+                              alt={`${selectedTemplate?.label} example wrap ${example.label}`}
+                              loading="lazy"
+                              onError={() =>
+                                setBrokenExampleIds((current) =>
+                                  current[example.id] ? current : { ...current, [example.id]: true },
+                                )
+                              }
+                            />
+                          )}
+                          <span>{example.label}</span>
+                          {isSelected && exampleLoadState === "loading" ? <small>Loading…</small> : null}
+                          {isBroken ? <small>Try loading or upload your own image.</small> : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {exampleFeedback ? (
+                  <p className={exampleLoadState === "error" ? "example-gallery-state error" : "pill"} role="status">
+                    {exampleFeedback}
+                  </p>
+                ) : null}
+              </div>
+            ) : artworkPanel === "upload" ? (
               <div className="stack-gap-xs">
                 <label className="field-label" htmlFor="artwork-upload">
                   Upload artwork image
@@ -560,6 +691,7 @@ export function WrapEditor() {
                     aria-pressed={selectedPresetId === preset.id}
                     onClick={() => {
                       setSelectedPresetId(preset.id);
+                      setArtworkPanel("preset");
                       setArtworkSource("preset");
                     }}
                   >
@@ -672,7 +804,7 @@ export function WrapEditor() {
             {isTemplateLoading ? <div className="overlay-card">Loading template…</div> : null}
             {activeErrorMessage ? <div className="overlay-card error">{activeErrorMessage}</div> : null}
             {artworkSource === "none" && !isTemplateLoading && !activeErrorMessage ? (
-              <div className="overlay-card subtle">Select a preset or upload artwork to fill the masked area.</div>
+              <div className="overlay-card subtle">Select an example, a preset, or upload artwork to fill the masked area.</div>
             ) : null}
             <canvas ref={previewCanvasRef} className="preview-canvas" aria-hidden="true" />
           </div>
@@ -696,7 +828,7 @@ export function WrapEditor() {
         <h2>How to use this editor</h2>
         <ol>
           <li>Pick the Tesla model/trim that matches your vehicle.</li>
-          <li>Choose a generated finish or upload your own artwork.</li>
+          <li>Choose an example wrap, a generated finish, or upload your own artwork.</li>
           <li>Drag the artwork in the preview, then refine with scale and rotation controls.</li>
           <li>Export a PNG and upload it through Tesla&apos;s Paint Shop workflow.</li>
         </ol>

@@ -135,6 +135,41 @@ describe("WrapEditor export flow", () => {
     expect(screen.getByText(/Loaded upload: photo\.png/i)).toBeTruthy();
   });
 
+  it("shows only the selected vehicle example gallery", async () => {
+    render(<WrapEditor />);
+
+    await waitFor(() => expect(screen.getByText(/Loaded Cybertruck/i)).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: /Example wraps/i }));
+
+    expect(screen.getByRole("button", { name: /Load Graffiti orange example wrap/i })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Load Vintage Stripes example wrap/i })).toBeNull();
+
+    fireEvent.change(screen.getByLabelText(/Vehicle template/i), { target: { value: "model3" } });
+
+    await waitFor(() => expect(screen.getByText(/Loaded Model 3 — Legacy/i)).toBeTruthy());
+    await waitFor(() => expect(screen.queryByRole("button", { name: /Load Graffiti orange example wrap/i })).toBeNull());
+    expect(screen.getByRole("button", { name: /Load Vintage Stripes example wrap/i })).toBeTruthy();
+  });
+
+  it("clears a selected example when switching vehicles", async () => {
+    render(<WrapEditor />);
+
+    await waitFor(() => expect(screen.getByText(/Loaded Cybertruck/i)).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: /Example wraps/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Load Graffiti orange example wrap/i }));
+
+    await waitFor(() => expect(screen.getByText(/Loaded example: Graffiti orange\./i)).toBeTruthy());
+    await waitFor(() => expect(document.querySelector(".example-button.active")).toBeTruthy());
+
+    fireEvent.change(screen.getByLabelText(/Vehicle template/i), { target: { value: "model3" } });
+
+    await waitFor(() => expect(screen.getByText(/Loaded Model 3 — Legacy/i)).toBeTruthy());
+    expect(document.querySelector(".example-button.active")).toBeNull();
+    expect(screen.getByText(/Select an example, a preset, or upload artwork to fill the masked area\./i)).toBeTruthy();
+  });
+
 
 
   it("shows an error when the export blob fails Tesla validation", async () => {
