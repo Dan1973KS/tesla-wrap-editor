@@ -292,6 +292,8 @@ export function WrapEditor() {
         }
 
         const message = error instanceof Error ? error.message : "Unable to load the selected template.";
+        setTemplateImage(null);
+        setMaskCanvas(null);
         setErrorMessage(message);
         setStatusMessage("Template load failed.");
       })
@@ -490,7 +492,10 @@ export function WrapEditor() {
               value={selectedTemplateId}
               onChange={(event) => {
                 setIsTemplateLoading(true);
+                setTemplateImage(null);
+                setMaskCanvas(null);
                 setErrorMessage(null);
+                setStatusMessage("Loading template…");
                 setTransform(DEFAULT_TRANSFORM);
                 setExportName(sanitizeFilenameBase(event.target.value) || "tesla-wrap");
                 setSelectedTemplateId(event.target.value);
@@ -640,9 +645,17 @@ export function WrapEditor() {
             </a>
           </div>
 
+          <p id="preview-instructions" className="sr-only">
+            Drag inside the preview with a mouse or touch pointer to reposition artwork. Keyboard and assistive technology
+            users can use the X and Y offset sliders in step 3 for the same adjustment.
+          </p>
           <div
             ref={previewRegionRef}
             className="preview-region"
+            role="group"
+            tabIndex={0}
+            aria-label="Wrap preview workspace"
+            aria-describedby="preview-instructions"
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
@@ -653,7 +666,7 @@ export function WrapEditor() {
             {artworkSource === "none" && !isTemplateLoading && !errorMessage ? (
               <div className="overlay-card subtle">Select a preset or upload artwork to fill the masked area.</div>
             ) : null}
-            <canvas ref={previewCanvasRef} className="preview-canvas" aria-label="Wrap preview canvas" />
+            <canvas ref={previewCanvasRef} className="preview-canvas" aria-hidden="true" />
           </div>
 
           <div className="status-grid" aria-live="polite">
