@@ -583,19 +583,27 @@ export function WrapEditor() {
 
           <div className="stack-gap-sm">
             <h2>2. Choose wrap artwork</h2>
-            <div className="tab-row" aria-label="Artwork source">
+            <div className="tab-row" role="tablist" aria-label="Artwork source">
               <button
                 type="button"
+                role="tab"
+                id="artwork-tab-example"
                 className={artworkPanel === "example" ? "tab-button active" : "tab-button"}
-                aria-pressed={artworkPanel === "example"}
+                aria-selected={artworkPanel === "example"}
+                aria-controls="artwork-panel-example"
+                tabIndex={artworkPanel === "example" ? 0 : -1}
                 onClick={() => setArtworkPanel("example")}
               >
                 Example wraps
               </button>
               <button
                 type="button"
+                role="tab"
+                id="artwork-tab-preset"
                 className={artworkPanel === "preset" ? "tab-button active" : "tab-button"}
-                aria-pressed={artworkPanel === "preset"}
+                aria-selected={artworkPanel === "preset"}
+                aria-controls="artwork-panel-preset"
+                tabIndex={artworkPanel === "preset" ? 0 : -1}
                 onClick={() => {
                   setArtworkPanel("preset");
                   setArtworkSource("preset");
@@ -605,8 +613,12 @@ export function WrapEditor() {
               </button>
               <button
                 type="button"
+                role="tab"
+                id="artwork-tab-upload"
                 className={artworkPanel === "upload" ? "tab-button active" : "tab-button"}
-                aria-pressed={artworkPanel === "upload"}
+                aria-selected={artworkPanel === "upload"}
+                aria-controls="artwork-panel-upload"
+                tabIndex={artworkPanel === "upload" ? 0 : -1}
                 onClick={() => {
                   setArtworkPanel("upload");
                   setArtworkSource("upload");
@@ -617,7 +629,7 @@ export function WrapEditor() {
             </div>
 
             {artworkPanel === "example" ? (
-              <div className="stack-gap-xs">
+              <div className="stack-gap-xs" role="tabpanel" id="artwork-panel-example" aria-labelledby="artwork-tab-example">
                 <div>
                   <p id="example-gallery-label" className="field-label">
                     Example wraps for {selectedTemplate?.label}
@@ -637,35 +649,36 @@ export function WrapEditor() {
                       const isBroken = Boolean(brokenExampleIds[example.id]);
 
                       return (
-                        <button
-                          key={example.id}
-                          type="button"
-                          className={isSelected ? "example-button active" : "example-button"}
-                          aria-pressed={isSelected}
-                          aria-label={`Load ${example.label} example wrap`}
-                          onClick={() => handleExampleSelect(example)}
-                        >
-                          {isBroken ? (
-                            <div className="example-image-fallback">Preview unavailable</div>
-                          ) : (
-                            <NextImage
-                              src={example.imageUrl}
-                              alt={`${selectedTemplate?.label} example wrap ${example.label}`}
-                              width={512}
-                              height={512}
-                              loading="lazy"
-                              unoptimized
-                              onError={() =>
-                                setBrokenExampleIds((current) =>
-                                  current[example.id] ? current : { ...current, [example.id]: true },
-                                )
-                              }
-                            />
-                          )}
-                          <span>{example.label}</span>
-                          {isSelected && exampleLoadState === "loading" ? <small>Loading…</small> : null}
-                          {isBroken ? <small>Try loading or upload your own image.</small> : null}
-                        </button>
+                        <div key={example.id} role="listitem">
+                          <button
+                            type="button"
+                            className={isSelected ? "example-button active" : "example-button"}
+                            aria-pressed={isSelected}
+                            aria-label={`Load ${example.label} example wrap`}
+                            onClick={() => handleExampleSelect(example)}
+                          >
+                            {isBroken ? (
+                              <div className="example-image-fallback">Preview unavailable</div>
+                            ) : (
+                              <NextImage
+                                src={example.imageUrl}
+                                alt={`${selectedTemplate?.label} example wrap ${example.label}`}
+                                width={512}
+                                height={512}
+                                loading="lazy"
+                                unoptimized
+                                onError={() =>
+                                  setBrokenExampleIds((current) =>
+                                    current[example.id] ? current : { ...current, [example.id]: true },
+                                  )
+                                }
+                              />
+                            )}
+                            <span>{example.label}</span>
+                            {isSelected && exampleLoadState === "loading" ? <small>Loading…</small> : null}
+                            {isBroken ? <small>Try loading or upload your own image.</small> : null}
+                          </button>
+                        </div>
                       );
                     })}
                   </div>
@@ -677,7 +690,7 @@ export function WrapEditor() {
                 ) : null}
               </div>
             ) : artworkPanel === "upload" ? (
-              <div className="stack-gap-xs">
+              <div className="stack-gap-xs" role="tabpanel" id="artwork-panel-upload" aria-labelledby="artwork-tab-upload">
                 <label className="field-label" htmlFor="artwork-upload">
                   Upload artwork image
                 </label>
@@ -686,7 +699,7 @@ export function WrapEditor() {
                 {uploadName ? <p className="pill">Current upload: {uploadName}</p> : null}
               </div>
             ) : (
-              <div className="preset-grid">
+              <div className="preset-grid" role="tabpanel" id="artwork-panel-preset" aria-labelledby="artwork-tab-preset">
                 {artworkPresets.map((preset) => (
                   <button
                     key={preset.id}

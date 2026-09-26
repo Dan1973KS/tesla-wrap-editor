@@ -128,7 +128,7 @@ describe("WrapEditor export flow", () => {
 
     await waitFor(() => expect(screen.getByText(/Loaded Cybertruck/i)).toBeTruthy());
 
-    fireEvent.click(screen.getByRole("button", { name: /Upload image/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /Upload image/i }));
     fireEvent.change(screen.getByLabelText(/Upload artwork image/i), {
       target: {
         files: [new File(["fake-image"], "photo.png", { type: "image/png" })],
@@ -144,7 +144,7 @@ describe("WrapEditor export flow", () => {
 
     await waitFor(() => expect(screen.getByText(/Loaded Cybertruck/i)).toBeTruthy());
 
-    fireEvent.click(screen.getByRole("button", { name: /Example wraps/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /Example wraps/i }));
 
     expect(screen.getByRole("button", { name: /Load Graffiti orange example wrap/i })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Load Vintage Stripes example wrap/i })).toBeNull();
@@ -161,7 +161,7 @@ describe("WrapEditor export flow", () => {
 
     await waitFor(() => expect(screen.getByText(/Loaded Cybertruck/i)).toBeTruthy());
 
-    fireEvent.click(screen.getByRole("button", { name: /Example wraps/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /Example wraps/i }));
     fireEvent.click(screen.getByRole("button", { name: /Load Graffiti orange example wrap/i }));
 
     await waitFor(() => expect(screen.getByText(/Loaded example: Graffiti orange\./i)).toBeTruthy());
