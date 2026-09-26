@@ -35,6 +35,17 @@ function createCanvasContextMock() {
   } satisfies Partial<CanvasRenderingContext2D>;
 }
 
+class MockFileReader {
+  onload: null | (() => void) = null;
+  onerror: null | (() => void) = null;
+  result: string | ArrayBuffer | null = null;
+
+  readAsDataURL(file: File) {
+    this.result = `data:${file.type};base64,ZmFrZQ==`;
+    queueMicrotask(() => this.onload?.());
+  }
+}
+
 class MockImage {
   onload: null | (() => void) = null;
   onerror: null | (() => void) = null;
@@ -60,6 +71,7 @@ describe("WrapEditor export flow", () => {
   let lastDownloadName = "";
 
   beforeEach(() => {
+    vi.stubGlobal("FileReader", MockFileReader);
     vi.stubGlobal("Image", MockImage);
     vi.stubGlobal(
       "ResizeObserver",
@@ -103,6 +115,24 @@ describe("WrapEditor export flow", () => {
 
     await waitFor(() => expect(screen.getByText(/Enter a filename before exporting/i)).toBeTruthy());
     expect(clickSpy).not.toHaveBeenCalled();
+  });
+
+
+
+  it("loads an uploaded image and reports it in the UI", async () => {
+    render(<WrapEditor />);
+
+    await waitFor(() => expect(screen.getByText(/Loaded Cybertruck/i)).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: /Upload image/i }));
+    fireEvent.change(screen.getByLabelText(/Upload artwork image/i), {
+      target: {
+        files: [new File(["fake-image"], "photo.png", { type: "image/png" })],
+      },
+    });
+
+    await waitFor(() => expect(screen.getByText(/Current upload: photo\.png/i)).toBeTruthy());
+    expect(screen.getByText(/Loaded upload: photo\.png/i)).toBeTruthy();
   });
 
   it("downloads a png when export succeeds", async () => {

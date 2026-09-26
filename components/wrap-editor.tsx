@@ -63,6 +63,15 @@ async function loadImage(src: string) {
   return image;
 }
 
+async function readFileAsDataUrl(file: File) {
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+    reader.onerror = () => reject(new Error(`Unable to read file: ${file.name}`));
+    reader.readAsDataURL(file);
+  });
+}
+
 function createMaskCanvas(templateImage: HTMLImageElement) {
   const canvas = document.createElement("canvas");
   canvas.width = PREVIEW_SIZE;
@@ -187,7 +196,6 @@ function drawComposition(options: {
 }
 
 function renderExportBlob(options: {
-  templateImage: HTMLImageElement;
   maskCanvas: HTMLCanvasElement;
   uploadImage: HTMLImageElement | null;
   source: ArtworkSource;
@@ -195,7 +203,7 @@ function renderExportBlob(options: {
   transform: TransformState;
   outputSize: number;
 }) {
-  const { maskCanvas, outputSize, presetId, source, templateImage, transform, uploadImage } = options;
+  const { maskCanvas, outputSize, presetId, source, transform, uploadImage } = options;
   const exportCanvas = document.createElement("canvas");
   exportCanvas.width = outputSize;
   exportCanvas.height = outputSize;
@@ -228,10 +236,6 @@ function renderExportBlob(options: {
     }
   }
 
-  const placement = fitWithinSquare(templateImage.naturalWidth, templateImage.naturalHeight, PREVIEW_SIZE);
-  previewCtx.globalAlpha = 0.92;
-  previewCtx.drawImage(templateImage, placement.x, placement.y, placement.width, placement.height);
-  previewCtx.globalAlpha = 1;
   ctx.drawImage(scaledTemplate, 0, 0, outputSize, outputSize);
 
   return new Promise<Blob>((resolve, reject) => {
@@ -249,7 +253,6 @@ export function WrapEditor() {
   const [selectedTemplateId, setSelectedTemplateId] = useState(defaultTemplateId);
   const [artworkSource, setArtworkSource] = useState<ArtworkSource>("preset");
   const [selectedPresetId, setSelectedPresetId] = useState(artworkPresets[0]?.id ?? "midnight");
-  const [uploadUrl, setUploadUrl] = useState<string | null>(null);
   const [uploadImage, setUploadImage] = useState<HTMLImageElement | null>(null);
   const [uploadName, setUploadName] = useState("");
   const [transform, setTransform] = useState<TransformState>(DEFAULT_TRANSFORM);
@@ -268,12 +271,19 @@ export function WrapEditor() {
   const previewRegionRef = useRef<HTMLDivElement | null>(null);
 
   const selectedTemplate = useMemo(() => findTemplateById(selectedTemplateId), [selectedTemplateId]);
+  const catalogError = "No templates are configured. Add at least one entry to the template catalog.";
+  const effectiveStatusMessage = selectedTemplate ? statusMessage : "Template catalog is empty.";
+  const activeErrorMessage = selectedTemplate ? errorMessage : catalogError;
   const groupedTemplates = useMemo(
     () => templateFamilies.map((family) => ({ family, options: getTemplatesByFamily(family) })),
     [],
   );
 
   useEffect(() => {
+    if (!selectedTemplate) {
+      return;
+    }
+
     let cancelled = false;
 
     loadImage(selectedTemplate.templateUrl)
@@ -326,14 +336,6 @@ export function WrapEditor() {
   }, [artworkSource, maskCanvas, previewVersion, selectedPresetId, templateImage, transform, uploadImage]);
 
   useEffect(() => {
-    return () => {
-      if (uploadUrl) {
-        URL.revokeObjectURL(uploadUrl);
-      }
-    };
-  }, [uploadUrl]);
-
-  useEffect(() => {
     if (!previewRegionRef.current) {
       return;
     }
@@ -350,41 +352,31 @@ export function WrapEditor() {
       return;
     }
 
-    const objectUrl = URL.createObjectURL(file);
-
     try {
-      const image = await loadImage(objectUrl);
-      if (uploadUrl) {
-        URL.revokeObjectURL(uploadUrl);
-      }
-      setUploadUrl(objectUrl);
+      const dataUrl = await readFileAsDataUrl(file);
+      const image = await loadImage(dataUrl);
       setUploadImage(image);
       setUploadName(file.name);
       setArtworkSource("upload");
       setStatusMessage(`Loaded upload: ${file.name}`);
       setErrorMessage(null);
     } catch (error: unknown) {
-      URL.revokeObjectURL(objectUrl);
       const message = error instanceof Error ? error.message : "Unable to load the uploaded image.";
       setErrorMessage(message);
     }
-  }, [uploadUrl]);
+  }, []);
 
   const updateTransform = useCallback((key: keyof TransformState, value: number) => {
     setTransform((current) => ({ ...current, [key]: value }));
   }, []);
 
   const resetArtwork = useCallback(() => {
-    if (uploadUrl) {
-      URL.revokeObjectURL(uploadUrl);
-    }
-    setUploadUrl(null);
     setUploadImage(null);
     setUploadName("");
     setArtworkSource("none");
     setTransform(DEFAULT_TRANSFORM);
     setStatusMessage("Artwork reset. Select a preset or upload a new image.");
-  }, [uploadUrl]);
+  }, []);
 
   const handlePointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (artworkSource === "none") {
@@ -410,7 +402,9 @@ export function WrapEditor() {
 
   const handlePointerUp = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (dragState?.pointerId === event.pointerId) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
       setDragState(null);
     }
   }, [dragState]);
@@ -431,7 +425,6 @@ export function WrapEditor() {
       setIsExporting(true);
       setErrorMessage(null);
       const blob = await renderExportBlob({
-        templateImage,
         maskCanvas,
         uploadImage,
         source: artworkSource,
@@ -627,7 +620,7 @@ export function WrapEditor() {
                 </option>
               ))}
             </select>
-            <button type="button" className="primary-button" onClick={handleExport} disabled={isExporting || isTemplateLoading}>
+            <button type="button" className="primary-button" onClick={handleExport} disabled={isExporting || isTemplateLoading || !selectedTemplate}>
               {isExporting ? "Exporting…" : "Download PNG"}
             </button>
             <p className="field-help">
@@ -666,8 +659,8 @@ export function WrapEditor() {
             onPointerCancel={handlePointerUp}
           >
             {isTemplateLoading ? <div className="overlay-card">Loading template…</div> : null}
-            {errorMessage ? <div className="overlay-card error">{errorMessage}</div> : null}
-            {artworkSource === "none" && !isTemplateLoading && !errorMessage ? (
+            {activeErrorMessage ? <div className="overlay-card error">{activeErrorMessage}</div> : null}
+            {artworkSource === "none" && !isTemplateLoading && !activeErrorMessage ? (
               <div className="overlay-card subtle">Select a preset or upload artwork to fill the masked area.</div>
             ) : null}
             <canvas ref={previewCanvasRef} className="preview-canvas" aria-hidden="true" />
@@ -676,7 +669,7 @@ export function WrapEditor() {
           <div className="status-grid" aria-live="polite">
             <div>
               <strong>Status</strong>
-              <p>{statusMessage}</p>
+              <p>{effectiveStatusMessage}</p>
             </div>
             <div>
               <strong>Notes</strong>
